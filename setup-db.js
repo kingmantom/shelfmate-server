@@ -1,21 +1,32 @@
-const fs   = require("fs");
-const path = require("path");
+// setup-db.js – מאפס ומזין 40 מוצרים
+// -----------------------------------
+const fs      = require("fs");
+const path    = require("path");
 const sqlite3 = require("sqlite3").verbose();
 
-const db = new sqlite3.Database("./shelfmate.db");
+/* 1) נתיב מוחלט לקובץ DB */
+const dbPath = path.join(__dirname, "shelfmate.db");
+console.log("📁 Using DB at:", dbPath);
+const db = new sqlite3.Database(dbPath);
 
-/* ➊ טוענים את schema.sql – יוצר את שתי הטבלאות אם לא קיימות */
+/* 2) טעינת schema */
 const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
+
 db.exec(schema, (err) => {
   if (err) {
-    console.error("❌  failed to load schema:", err.message);
+    console.error("❌ failed to load schema:", err.message);
     process.exit(1);
   }
-  console.log("✅  schema loaded");
+  console.log("✅ schema loaded");
 
-  /* ➋ מאפסים וממלאים את טבלת inventory בלבד */
+  /* 3) איפוס ומילוי הטבלה */
   db.serialize(() => {
-    db.run("DELETE FROM inventory");
+    db.run("DELETE FROM inventory", (err) => {
+      if (err) {
+        console.error("❌ failed to clear inventory:", err.message);
+        process.exit(1);
+      }
+    });
 
     const stmt = db.prepare(`
       INSERT INTO inventory (
@@ -28,22 +39,39 @@ db.exec(schema, (err) => {
       ) VALUES (?, ?, ?, ?, ?, ?)
     `);
 
-    const products = ["קולה","מים","חלב","במבה","חטיף אנרגיה","יוגורט","שוקולד"];
+    const products = [
+      "קולה", "מים", "חלב", "במבה",
+      "חטיף אנרגיה", "יוגורט", "שוקולד"
+    ];
     const today = new Date();
 
     for (let i = 0; i < 40; i++) {
       const name      = products[Math.floor(Math.random() * products.length)];
-      const barcode   = "729000" + String(Math.floor(Math.random() * 1e6)).padStart(6, "0");
+      const barcode   = Math.random().toString().slice(2, 15); // 13-ספרות רנדומליות
       const quantity  = Math.floor(Math.random() * 30);
       const desired   = 15 + Math.floor(Math.random() * 10);
-      const threshold = 5 + Math.floor(Math.random() * 6);  // סף אקראי בין 5 ל-10
+      const threshold = 5  + Math.floor(Math.random() * 6);
       const dateStr   = today.toISOString().split("T")[0];
 
-      stmt.run(name, barcode, quantity, desired, threshold, dateStr);
+      // הדפסת שגיאה אם INSERT נפל
+      stmt.run(
+        name, barcode, quantity, desired, threshold, dateStr,
+        (err) => { if (err) console.error("❌ insert failed:", err.message); }
+      );
     }
-    stmt.finalize(() => {
-      console.log("✅  inventory mock data inserted");
-      db.close();
+
+    stmt.finalize((err) => {
+      if (err) {
+        console.error("❌ stmt finalize error:", err.message);
+        process.exit(1);
+      }
+
+      // ספירת טבלה מיד אחרי ההכנסה
+      db.get("SELECT COUNT(*) AS n FROM inventory", (_, row) => {
+        console.log("📊 rows in inventory =", row.n); // אמור להיות 40
+        console.log("✅ inventory mock data inserted");
+        db.close(() => console.log("🔒 Database connection closed"));
+      });
     });
   });
 });

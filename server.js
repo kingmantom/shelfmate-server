@@ -4,24 +4,27 @@
 require('dotenv').config();
 console.log("🔑 Loaded BREVO_API_KEY:", process.env.BREVO_API_KEY);
 
-const express           = require('express');
-const sqlite3           = require('sqlite3').verbose();
-const cors              = require('cors');
-const path              = require('path');
+const express = require('express');
+const sqlite3 = require('sqlite3').verbose();
+const cors = require('cors');
+const path = require('path');
 // 0.1 ייבוא פונקציית שליחת המייל
 const { sendAlertEmail } = require('./brevoMailer');
 
-const app  = express();
+const app = express();
 const port = process.env.PORT || 4000;
 
-// פתח חיבור למסד הנתונים
+// פתח חיבור למסד הנתונים – תמיד מתוך התיקייה הנוכחית
 const dbPath = path.join(__dirname, 'shelfmate.db');
-const db     = new sqlite3.Database(dbPath);
+console.log('📁 API USING DB:', dbPath);   // << הדפסה לאבחון נתיב ה-DB
+const db = new sqlite3.Database(dbPath);
 
 app.use(cors());
 app.use(express.json());
 
-// 🔐 0. Login – שדה email + password, מחזיר role
+/* ------------------------------------------------------------------
+   🔐 0. Login – שדה email + password, מחזיר role
+   ------------------------------------------------------------------ */
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   if (password === 'admin' || password === 'employee') {
@@ -30,15 +33,41 @@ app.post('/api/login', (req, res) => {
   res.status(401).json({ error: 'Invalid credentials' });
 });
 
-// 📦 1. קבלת כל פריטי המלאי (snapshot)
+/* ------------------------------------------------------------------
+   📦 1. קבלת כל פריטי המלאי (snapshot) – תמיכה ב-?limit=
+   ------------------------------------------------------------------ */
 app.get('/api/inventory', (req, res) => {
-  db.all('SELECT * FROM inventory ORDER BY created_at DESC', (err, rows) => {
+  const limit = Number(req.query.limit);
+  const sql   = limit
+    ? 'SELECT * FROM inventory ORDER BY created_at DESC LIMIT ?'
+    : 'SELECT * FROM inventory ORDER BY created_at DESC';
+  const params = limit ? [limit] : [];
+
+  db.all(sql, params, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
 });
 
-// 📦 2. קבלת כל רישומי ההיסטוריה החודשית
+/* ------------------------------------------------------------------
+   📈 1-bis. סטטוס בסיסי – כמה רשומות יש בכל טבלה
+   ------------------------------------------------------------------ */
+app.get('/api/stats', (_req, res) => {
+  db.get(
+    `SELECT
+        (SELECT COUNT(*) FROM inventory)         AS inventory_rows,
+        (SELECT COUNT(*) FROM inventory_history) AS history_rows`,
+    [],
+    (err, row) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(row); // { inventory_rows: 40, history_rows: 480 }
+    }
+  );
+});
+
+/* ------------------------------------------------------------------
+   📦 2. קבלת כל רישומי ההיסטוריה החודשית
+   ------------------------------------------------------------------ */
 app.get('/api/inventory-history', (req, res) => {
   db.all(
     `SELECT * 
@@ -51,7 +80,9 @@ app.get('/api/inventory-history', (req, res) => {
   );
 });
 
-// 📊 3. קבלת נתוני Forecast: סכום צריכה/הזמנה/בזבוז לפי חודש
+/* ------------------------------------------------------------------
+   📊 3. קבלת נתוני Forecast: סכום צריכה/הזמנה/בזבוז לפי חודש
+   ------------------------------------------------------------------ */
 app.get('/api/forecast-data', (req, res) => {
   const sql = `
     SELECT
@@ -69,7 +100,9 @@ app.get('/api/forecast-data', (req, res) => {
   });
 });
 
-// 📣 4. קבלת מוצרים במלאי נמוך (כמות < threshold)
+/* ------------------------------------------------------------------
+   📣 4. קבלת מוצרים במלאי נמוך (quantity < threshold)
+   ------------------------------------------------------------------ */
 app.get('/api/low-stock', (req, res) => {
   const sql = `
     SELECT id, name, barcode, quantity, threshold
@@ -83,7 +116,9 @@ app.get('/api/low-stock', (req, res) => {
   });
 });
 
-// ➕ 5. הוספת מוצר חדש
+/* ------------------------------------------------------------------
+   ➕ 5. הוספת מוצר חדש
+   ------------------------------------------------------------------ */
 app.post('/api/inventory', (req, res) => {
   const { name, barcode, quantity, desired_quantity, threshold, created_at } = req.body;
   const stmt = db.prepare(`
@@ -105,7 +140,9 @@ app.post('/api/inventory', (req, res) => {
   );
 });
 
-// 🗑️ 6. מחיקת מוצר על פי ID
+/* ------------------------------------------------------------------
+   🗑️ 6. מחיקת מוצר על פי ID
+   ------------------------------------------------------------------ */
 app.delete('/api/inventory/:id', (req, res) => {
   const { id } = req.params;
   db.run('DELETE FROM inventory WHERE id = ?', id, function (err) {
@@ -114,7 +151,9 @@ app.delete('/api/inventory/:id', (req, res) => {
   });
 });
 
-// 🛠️ 7. עדכון דינמי: quantity, desired_quantity, threshold
+/* ------------------------------------------------------------------
+   🛠️ 7. עדכון דינמי: quantity, desired_quantity, threshold
+   ------------------------------------------------------------------ */
 app.put('/api/inventory/:id', (req, res) => {
   const { id } = req.params;
   const { quantity, desired_quantity, threshold } = req.body;
@@ -146,7 +185,9 @@ app.put('/api/inventory/:id', (req, res) => {
   });
 });
 
-// 📊 8. צריכה לפי מוצר בחודש בשנה שעברה
+/* ------------------------------------------------------------------
+   📊 8. צריכה לפי מוצר בחודש בשנה שעברה
+   ------------------------------------------------------------------ */
 app.get('/api/consumption-last-year', (req, res) => {
   const month     = String(req.query.month || '').padStart(2, '0');
   const lastYear  = new Date().getFullYear() - 1;
@@ -169,7 +210,9 @@ app.get('/api/consumption-last-year', (req, res) => {
   });
 });
 
-// 🚨 9. מסלול לשליחת מיילי התראה
+/* ------------------------------------------------------------------
+   🚨 9. מסלול לשליחת מיילי התראה
+   ------------------------------------------------------------------ */
 app.post('/api/send-alert', async (req, res) => {
   const { email, subject, html } = req.body;
   try {
@@ -181,7 +224,9 @@ app.post('/api/send-alert', async (req, res) => {
   }
 });
 
-// 🔀 (prod) – serve static React build
+/* ------------------------------------------------------------------
+   🔀 (prod) – serve static React build (מבוטל בפיתוח)
+   ------------------------------------------------------------------ */
 /*
 app.use(express.static(path.join(__dirname, '../shelfmate-frontend/build')));
 app.get('/*', (req, res) => {
@@ -191,7 +236,9 @@ app.get('/*', (req, res) => {
 });
 */
 
-// הפעלת ה־API
+/* ------------------------------------------------------------------
+   🟢 הפעלת ה-API
+   ------------------------------------------------------------------ */
 app.listen(port, () => {
   console.log(`🟢 Server is running on http://localhost:${port}`);
 });

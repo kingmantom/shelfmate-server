@@ -1,6 +1,5 @@
-DROP TABLE IF EXISTS inventory;
 
-CREATE TABLE inventory (
+CREATE TABLE IF NOT EXISTS inventory (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     name             TEXT       NOT NULL,
     barcode          TEXT UNIQUE,           -- ברקוד מזהה
@@ -10,10 +9,9 @@ CREATE TABLE inventory (
     created_at       TEXT       DEFAULT (DATE('now'))  -- תאריך הוספה
 );
 
-DROP TABLE IF EXISTS inventory_history;
 
 /* טבלת היסטוריית צריכה חודשית */
-CREATE TABLE inventory_history (
+CREATE TABLE IF NOT EXISTS inventory_history (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   barcode     TEXT NOT NULL,               -- קישור ל‑inventory.barcode
   year_month  TEXT NOT NULL,               -- YYYY‑MM
