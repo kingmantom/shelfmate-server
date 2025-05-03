@@ -12,7 +12,7 @@ const path = require('path');
 const { sendAlertEmail } = require('./brevoMailer');
 
 const app = express();
-const port = process.env.PORT || 4000;
+const port = process.env.PORT;
 
 // פתח חיבור למסד הנתונים – תמיד מתוך התיקייה הנוכחית
 const dbPath = path.join(__dirname, 'shelfmate.db');
