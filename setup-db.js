@@ -1,5 +1,4 @@
-// setup-db.js – מאפס ומזין 40 מוצרים
-// -----------------------------------
+// setup-db.js – מאפס ומזין 40 מוצרים (באנגלית)
 const fs      = require("fs");
 const path    = require("path");
 const sqlite3 = require("sqlite3").verbose();
@@ -39,21 +38,21 @@ db.exec(schema, (err) => {
       ) VALUES (?, ?, ?, ?, ?, ?)
     `);
 
+    // 🔠 שמות המוצרים באנגלית
     const products = [
-      "קולה", "מים", "חלב", "במבה",
-      "חטיף אנרגיה", "יוגורט", "שוקולד"
+      "Cola", "Water", "Milk", "Bamba",
+      "Energy Bar", "Yogurt", "Chocolate"
     ];
     const today = new Date();
 
     for (let i = 0; i < 40; i++) {
       const name      = products[Math.floor(Math.random() * products.length)];
-      const barcode   = Math.random().toString().slice(2, 15); // 13-ספרות רנדומליות
+      const barcode   = Math.random().toString().slice(2, 15); // 13 ספרות
       const quantity  = Math.floor(Math.random() * 30);
       const desired   = 15 + Math.floor(Math.random() * 10);
       const threshold = 5  + Math.floor(Math.random() * 6);
       const dateStr   = today.toISOString().split("T")[0];
 
-      // הדפסת שגיאה אם INSERT נפל
       stmt.run(
         name, barcode, quantity, desired, threshold, dateStr,
         (err) => { if (err) console.error("❌ insert failed:", err.message); }
@@ -66,9 +65,8 @@ db.exec(schema, (err) => {
         process.exit(1);
       }
 
-      // ספירת טבלה מיד אחרי ההכנסה
       db.get("SELECT COUNT(*) AS n FROM inventory", (_, row) => {
-        console.log("📊 rows in inventory =", row.n); // אמור להיות 40
+        console.log("📊 rows in inventory =", row.n);
         console.log("✅ inventory mock data inserted");
         db.close(() => console.log("🔒 Database connection closed"));
       });

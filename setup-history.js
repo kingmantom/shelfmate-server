@@ -14,11 +14,9 @@ db.exec(schema, (err) => {
   if (err) throw err;
   console.log("✅ schema loaded");
 
-  /* 1. מוחקים היסטוריה קודמת */
   db.run("DELETE FROM inventory_history", (err) => {
     if (err) throw err;
 
-    /* 2. מכינים INSERT */
     const insert = db.prepare(`
       INSERT INTO inventory_history
         (barcode, year_month,
@@ -27,14 +25,15 @@ db.exec(schema, (err) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    /* 3. לכל ברקוד – 12 חודשים אחורה */
     db.all("SELECT barcode FROM inventory", (err, rows) => {
       if (err) throw err;
 
       const now = new Date();
+      const totalMonths = 36; // שלוש שנים
+
       rows.forEach(({ barcode }) => {
-        for (let m = 0; m < 12; m++) {
-          const date       = new Date(now.getFullYear(), now.getMonth() - m, 1);
+        for (let i = 0; i < totalMonths; i++) {
+          const date       = new Date(now.getFullYear(), now.getMonth() - i, 1);
           const yearMonth  = date.toISOString().slice(0, 7); // YYYY-MM
 
           const opening    = Math.floor(Math.random() * 120) + 30;
@@ -54,7 +53,7 @@ db.exec(schema, (err) => {
 
       insert.finalize((err) => {
         if (err) throw err;
-        console.log("✅ Fake monthly history created");
+        console.log("✅ Fixed 3-year history created");
         db.close(() => console.log("🔒 Database connection closed"));
       });
     });
