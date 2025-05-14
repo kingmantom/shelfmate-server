@@ -1,12 +1,12 @@
-
 CREATE TABLE IF NOT EXISTS inventory (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     name             TEXT       NOT NULL,
-    barcode          TEXT UNIQUE,           -- ברקוד מזהה
-    quantity         INTEGER    DEFAULT 0,  -- כמות בפועל
-    desired_quantity INTEGER    DEFAULT 0,  -- כמות רצויה
-    threshold        INTEGER    DEFAULT 5,  -- סף התראה (למשל 5)
-    created_at       TEXT       DEFAULT (DATE('now'))  -- תאריך הוספה
+    barcode          TEXT UNIQUE,
+    quantity         INTEGER    DEFAULT 0,
+ 
+    threshold        INTEGER    DEFAULT 5,
+    created_at       TEXT       DEFAULT (DATE('now')),
+    expiry_date      TEXT       DEFAULT NULL               -- ✅ שדה חדש: תאריך תוקף
 );
 
 
